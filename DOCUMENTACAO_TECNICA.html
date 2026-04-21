@@ -129,8 +129,16 @@
 O <strong>Cidades ESG Inteligentes</strong> é uma API REST desenvolvida em <strong>Java 21 + Spring Boot 3.2.5</strong>
 para monitoramento de indicadores ESG (Environmental, Social & Governance) em cidades brasileiras.
 Esta entrega foca em integrar práticas completas de DevOps: containerização com Docker multi-stage,
-orquestração via Docker Compose com overrides por ambiente (dev/staging/prod) e pipeline CI/CD funcional no GitHub Actions.
+orquestração via Docker Compose com overrides por ambiente (dev/staging/prod), pipeline CI/CD funcional no GitHub Actions
+e <strong>deploy real em VM Azure</strong> nos ambientes de staging e produção.
 </p>
+
+<div class="success">
+<strong>Infraestrutura pública:</strong><br>
+• Repositório: <code class="inline">github.com/BrunoTizer/cidades-esg-inteligentes</code><br>
+• Staging: <code class="inline">http://51.120.75.55:8081/</code><br>
+• Produção: <code class="inline">http://51.120.75.55:8082/</code>
+</div>
 
 <h3>Arquitetura de alto nível</h3>
 <div class="ascii-diagram">
@@ -166,11 +174,26 @@ define cinco jobs encadeados, executados em agentes <code class="inline">ubuntu-
 <h2>2.1 Etapas do pipeline</h2>
 <table>
   <tr><th>#</th><th>Job</th><th>Responsabilidade</th><th>Dispara em</th></tr>
-  <tr><td>1</td><td><strong>build-and-test</strong></td><td><code class="inline">mvn verify -B</code> — compila e executa os 11 testes JUnit. Publica relatório Surefire e cobertura no Codecov.</td><td>Todos os pushes e PRs</td></tr>
-  <tr><td>2</td><td><strong>docker-build</strong></td><td>Build multi-stage da imagem, push para <code class="inline">ghcr.io</code> com tags <code class="inline">sha</code>, branch e <code class="inline">latest</code>. Usa cache de layers GHA.</td><td>Depois do job 1</td></tr>
-  <tr><td>3</td><td><strong>deploy-staging</strong></td><td>SSH no servidor de staging, <code class="inline">docker compose pull</code> + <code class="inline">up -d</code> com override <code class="inline">docker-compose.staging.yml</code>.</td><td>Branches <code class="inline">develop</code> ou <code class="inline">main</code></td></tr>
-  <tr><td>4</td><td><strong>integration-tests-staging</strong></td><td>Smoke tests via <code class="inline">curl</code> em todos os endpoints da URL de staging.</td><td>Depois do job 3</td></tr>
-  <tr><td>5</td><td><strong>deploy-production</strong></td><td>Backup do Postgres com <code class="inline">pg_dump</code>, deploy via SSH com override de produção, cria Release no GitHub.</td><td>Somente branch <code class="inline">main</code></td></tr>
+  <tr><td>1</td><td><strong>build-and-test</strong></td><td><code class="inline">mvn verify -B</code> — compila e executa os 11 testes JUnit com MockMvc. Publica relatório Surefire.</td><td>Todos os pushes e PRs</td></tr>
+  <tr><td>2</td><td><strong>docker-build</strong></td><td>Build multi-stage da imagem, push para <code class="inline">ghcr.io/brunotizer/cidades-esg-api</code> com tags <code class="inline">sha-XXXX</code>, branch e <code class="inline">latest</code>. Cache de layers GHA.</td><td>Depois do job 1</td></tr>
+  <tr><td>3</td><td><strong>deploy-staging</strong></td><td>SSH na VM Azure, login no GHCR com <code class="inline">GITHUB_TOKEN</code>, puxa imagem e executa <code class="inline">docker compose -p esg-staging up -d</code>.</td><td>Branches <code class="inline">develop</code> ou <code class="inline">main</code></td></tr>
+  <tr><td>4</td><td><strong>integration-tests-staging</strong></td><td>Smoke tests públicos via <code class="inline">curl http://51.120.75.55:8081/...</code> em todos os endpoints.</td><td>Depois do job 3</td></tr>
+  <tr><td>5</td><td><strong>deploy-production</strong></td><td>Backup do Postgres com <code class="inline">pg_dump</code>, SSH na VM, deploy em <code class="inline">/opt/cidades-esg-prod/</code> com <code class="inline">docker compose -p esg-prod</code>, cria Release no GitHub.</td><td>Somente branch <code class="inline">main</code></td></tr>
+</table>
+
+<h2>2.2 Infraestrutura Azure</h2>
+<p>A infra de deploy foi provisionada via <strong>Azure CLI</strong> no plano <strong>Azure for Students (FIAP)</strong>:</p>
+<table>
+  <tr><th>Recurso</th><th>Valor</th></tr>
+  <tr><td>Resource Group</td><td><code class="inline">esg-rg-no</code></td></tr>
+  <tr><td>Região</td><td>Norway East (restrição de policy FIAP)</td></tr>
+  <tr><td>VM</td><td>Standard_B2s — 2 vCPU, 4 GB RAM</td></tr>
+  <tr><td>OS</td><td>Ubuntu Server 22.04 LTS</td></tr>
+  <tr><td>IP público estático</td><td><code class="inline">51.120.75.55</code></td></tr>
+  <tr><td>Acesso</td><td>SSH chave RSA 4096 bits, usuário <code class="inline">azureuser</code></td></tr>
+  <tr><td>Portas abertas no NSG</td><td>22 (SSH), 8081 (staging), 8082 (produção)</td></tr>
+  <tr><td>Staging</td><td><code class="inline">/opt/cidades-esg-staging/</code> — project <code class="inline">esg-staging</code></td></tr>
+  <tr><td>Produção</td><td><code class="inline">/opt/cidades-esg-prod/</code> — project <code class="inline">esg-prod</code></td></tr>
 </table>
 
 <h2>2.2 Lógica do pipeline</h2>
@@ -329,21 +352,29 @@ docker compose down</pre>
   <div class="caption">Acesso via Nginx (<code class="inline">http://localhost:80</code>) — proxy reverso operando.</div>
 </div>
 
-<h2>4.3 Ambientes Staging e Produção</h2>
-
+<h2>4.3 Pipeline CI/CD completo (GitHub Actions)</h2>
 <div class="screenshot">
-  <img src="public/print-09-staging.png" alt="Staging">
+  <img src="public/print-11-github-actions.png" alt="Pipeline verde">
   <div class="caption">
-    <strong>Staging:</strong> <code class="inline">docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d</code><br>
-    API retornando <code class="inline">"ambiente":"staging"</code>.
+    <strong>Execução #6:</strong> todos os 5 jobs verdes em 2m 14s — build, testes, Docker push, deploy staging, smoke tests, deploy produção.
   </div>
 </div>
 
+<h2>4.4 Ambiente de Staging — VM Azure pública</h2>
 <div class="screenshot">
-  <img src="public/print-10-production.png" alt="Production">
+  <img src="public/print-09-staging.png" alt="Staging Azure">
   <div class="caption">
-    <strong>Produção:</strong> <code class="inline">docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d</code><br>
-    API retornando <code class="inline">"ambiente":"production"</code>.
+    <strong>Staging:</strong> <code class="inline">http://51.120.75.55:8081/</code> — resposta da API:
+    <code class="inline">{"ambiente":"staging", "versao":"sha-9870bb5"}</code>. Deploy automático via SSH pelo pipeline.
+  </div>
+</div>
+
+<h2>4.5 Ambiente de Produção — VM Azure pública</h2>
+<div class="screenshot">
+  <img src="public/print-10-production.png" alt="Produção Azure">
+  <div class="caption">
+    <strong>Produção:</strong> <code class="inline">http://51.120.75.55:8082/</code> — resposta da API:
+    <code class="inline">{"ambiente":"production", "versao":"sha-9870bb5"}</code>. Promovido após smoke tests em staging.
   </div>
 </div>
 
@@ -369,6 +400,18 @@ docker compose down</pre>
 <h2>Desafio 5 — Encoding UTF-8 em dados com acentos</h2>
 <p><strong>Problema:</strong> Cidades como "São Paulo", "Florianópolis" e a categoria "Governança" apareciam com caracteres estranhos em algumas ferramentas de formatação JSON.</p>
 <p><strong>Solução:</strong> Spring Boot entrega UTF-8 por padrão (verificado via <code class="inline">curl</code> direto). Usamos <code class="inline">application.properties</code> padrão e mantivemos os arquivos <code class="inline">.java</code> com encoding UTF-8.</p>
+
+<h2>Desafio 6 — Restrições da subscription Azure for Students</h2>
+<p><strong>Problema:</strong> Ao tentar criar a VM, uma policy do tenant FIAP restringiu a subscription a apenas 5 regiões (<em>norwayeast, germanywestcentral, switzerlandnorth, chilecentral, brazilsouth</em>), e Brazil South apresentou capacidade esgotada para a série B de VMs — que é a mais econômica para o free tier.</p>
+<p><strong>Solução:</strong> Usamos <code class="inline">az vm list-skus</code> para mapear a capacidade real em cada região permitida e migramos para <strong>Norway East</strong>, onde a série B estava disponível. Provisionamos uma <code class="inline">Standard_B2s</code> (2 vCPU, 4 GB RAM), com IP estático e NSG liberando somente as portas necessárias.</p>
+
+<h2>Desafio 7 — Conflito de portas entre stacks na mesma VM</h2>
+<p><strong>Problema:</strong> Rodar os dois ambientes (staging e produção) na mesma VM gerou conflito: a API expunha <code class="inline">8080</code> por padrão no compose base, e a tentativa de subir o segundo stack falhava com <em>"port is already allocated"</em>. Além disso, <code class="inline">container_name</code> fixos impediam múltiplos projetos.</p>
+<p><strong>Solução:</strong> Removemos <code class="inline">container_name</code> do compose base (agora os nomes vêm do projeto — <code class="inline">esg-staging-*</code> e <code class="inline">esg-prod-*</code>) e refatoramos a estratégia de portas: o base usa apenas <code class="inline">expose</code> (porta interna na rede do compose), e cada ambiente define suas portas via override — Nginx em <strong>8081</strong> (staging) e <strong>8082</strong> (produção). Um <code class="inline">docker-compose.override.yml</code> mantém a experiência de dev local expondo todas as portas.</p>
+
+<h2>Desafio 8 — Nginx não recriado em redeploys</h2>
+<p><strong>Problema:</strong> Quando apenas o <code class="inline">nginx.conf</code> mudava, <code class="inline">docker compose up -d</code> não recriava o container (imagem era a mesma), deixando o ambiente com a configuração antiga.</p>
+<p><strong>Solução:</strong> Adicionamos <code class="inline">--force-recreate</code> no comando do pipeline, garantindo que toda nova execução refletisse as mudanças de configuração.</p>
 
 <!-- ====== 6. CHECKLIST ====== -->
 <h1>6. Checklist de Entrega</h1>

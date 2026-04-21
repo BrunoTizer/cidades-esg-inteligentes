@@ -1,6 +1,10 @@
 # Projeto - Cidades ESG Inteligentes
 
-> API REST para monitoramento de indicadores ESG (Environmental, Social & Governance) em cidades brasileiras — construída com Java Spring Boot, containerizada com Docker e com pipeline CI/CD completo via GitHub Actions.
+> API REST para monitoramento de indicadores ESG (Environmental, Social & Governance) em cidades brasileiras — construída com Java Spring Boot, containerizada com Docker e com pipeline CI/CD completo via GitHub Actions com deploy automático em VM Azure.
+
+**Repositório público:** https://github.com/BrunoTizer/cidades-esg-inteligentes
+**Staging:** http://51.120.75.55:8081/
+**Produção:** http://51.120.75.55:8082/
 
 ![Java](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.5-brightgreen)
@@ -116,6 +120,16 @@ mvn verify
 ### Ferramenta: GitHub Actions
 
 Arquivo: `.github/workflows/ci-cd.yml` — acionado em `push` e `pull_request` nas branches `main`, `develop` e `feature/**`.
+
+### Infraestrutura de Deploy — VM Azure
+
+O deploy automatizado está configurado para uma **VM Ubuntu 22.04 Standard_B2s** (2 vCPU, 4GB RAM) provisionada na região **Norway East** via **Azure for Students (plano FIAP)**. Na VM:
+
+- Pasta `/opt/cidades-esg-staging/` roda o stack de staging via `docker compose -p esg-staging` — Nginx na porta **8081**
+- Pasta `/opt/cidades-esg-prod/` roda o stack de produção via `docker compose -p esg-prod` — Nginx na porta **8082**
+- Network Security Group libera portas 22 (SSH), 8081 (staging) e 8082 (produção)
+
+O pipeline faz SSH na VM com uma chave SSH dedicada (secrets `STAGING_SSH_KEY` / `PROD_SSH_KEY`), puxa a imagem mais recente do ghcr.io e executa `docker compose up -d --force-recreate`.
 
 ### Fluxo do pipeline
 
@@ -267,15 +281,20 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 ### 8. Containers saudáveis + 11 testes passando + arquitetura
 ![docker compose ps + testes](public/print-08-docker-testes.png)
 
-### 9. Ambiente de Staging — `SPRING_PROFILES_ACTIVE=staging`
-> Execução com `docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d` — `ambiente: staging` retornado pela API.
+### 9. Ambiente de Staging rodando em VM Azure
+> **URL pública:** http://51.120.75.55:8081/ — API respondendo `"ambiente":"staging"` após deploy automático do pipeline.
 
-![Staging](public/print-09-staging.png)
+![Staging Azure](public/print-09-staging.png)
 
-### 10. Ambiente de Produção — `SPRING_PROFILES_ACTIVE=production`
-> Execução com `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` — `ambiente: production` retornado pela API.
+### 10. Ambiente de Produção rodando em VM Azure
+> **URL pública:** http://51.120.75.55:8082/ — API respondendo `"ambiente":"production"` após promoção via pipeline.
 
-![Production](public/print-10-production.png)
+![Produção Azure](public/print-10-production.png)
+
+### 11. Pipeline GitHub Actions — todos os 5 jobs verdes
+> Execução #6 concluída em 2m 14s: build → testes (11) → Docker push → deploy staging → smoke tests → deploy produção.
+
+![GitHub Actions](public/print-11-github-actions.png)
 
 ### Resultado da suite de testes (Maven Surefire)
 
