@@ -1,0 +1,24 @@
+version: '3.9'
+
+# Override para ambiente de STAGING
+# Uso: docker compose -f docker-compose.yml -f docker-compose.staging.yml up
+
+services:
+  api:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/cidades-esg-api:${APP_VERSION:-staging}
+    environment:
+      SPRING_PROFILES_ACTIVE: staging
+      APP_VERSION: ${APP_VERSION:-staging}
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: []  # Não expor porta em staging
+
+  redis:
+    ports: []  # Não expor porta em staging

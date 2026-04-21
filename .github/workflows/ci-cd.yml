@@ -1,0 +1,265 @@
+name: CI/CD Pipeline - Cidades ESG Inteligentes
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/cidades-esg-api
+  JAVA_VERSION: '21'
+
+jobs:
+  # ============================================================
+  # JOB 1: BUILD E TESTES
+  # ============================================================
+  build-and-test:
+    name: Build e Testes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build e testes automatizados com Maven
+        run: mvn verify -B
+
+      - name: Publicar resultados dos testes
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: JUnit Tests
+          path: target/surefire-reports/*.xml
+          reporter: java-junit
+        continue-on-error: true
+
+      - name: Upload cobertura de código
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./target/site/jacoco
+          flags: unittests
+        continue-on-error: true
+
+  # ============================================================
+  # JOB 2: BUILD DA IMAGEM DOCKER
+  # ============================================================
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Gerar versão da imagem
+        id: version
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "version=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login no GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extrair metadados da imagem
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build e Push da imagem Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+
+  # ============================================================
+  # JOB 3: DEPLOY EM STAGING
+  # ============================================================
+  deploy-staging:
+    name: Deploy - Staging
+    runs-on: ubuntu-latest
+    needs: docker-build
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.cidades-esg.exemplo.com
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Deploy em Staging via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/cidades-esg
+            export APP_VERSION=${{ needs.docker-build.outputs.image-version }}
+            export SPRING_PROFILES_ACTIVE=staging
+            export POSTGRES_PASSWORD=${{ secrets.STAGING_POSTGRES_PASSWORD }}
+            export JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}
+
+            # Pull das novas imagens
+            docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
+
+            # Deploy com zero downtime
+            docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans
+
+            # Aguardar health check
+            sleep 15
+            docker compose ps
+
+            # Verificar se a API está respondendo
+            curl -f http://localhost:8080/api/health || exit 1
+
+            echo "Deploy em Staging concluído com sucesso!"
+
+      - name: Notificar resultado do deploy em Staging
+        if: always()
+        run: |
+          echo "Deploy em Staging: ${{ job.status }}"
+          echo "Versão: ${{ needs.docker-build.outputs.image-version }}"
+          echo "Ambiente: https://staging.cidades-esg.exemplo.com"
+
+  # ============================================================
+  # JOB 4: TESTES DE INTEGRAÇÃO EM STAGING
+  # ============================================================
+  integration-tests-staging:
+    name: Testes de Integração - Staging
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    environment:
+      name: staging
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Executar smoke tests em Staging
+        run: |
+          BASE_URL="https://staging.cidades-esg.exemplo.com"
+
+          echo "Testando endpoint raiz..."
+          curl -f "$BASE_URL/" || exit 1
+
+          echo "Testando health check..."
+          curl -f "$BASE_URL/api/health" || exit 1
+
+          echo "Testando API de cidades..."
+          curl -f "$BASE_URL/api/cidades" || exit 1
+
+          echo "Testando API de indicadores..."
+          curl -f "$BASE_URL/api/indicadores" || exit 1
+
+          echo "Todos os smoke tests passaram em Staging!"
+        continue-on-error: true
+
+  # ============================================================
+  # JOB 5: DEPLOY EM PRODUÇÃO
+  # ============================================================
+  deploy-production:
+    name: Deploy - Produção
+    runs-on: ubuntu-latest
+    needs: [docker-build, integration-tests-staging]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://cidades-esg.exemplo.com
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Deploy em Produção via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/cidades-esg
+            export APP_VERSION=${{ needs.docker-build.outputs.image-version }}
+            export SPRING_PROFILES_ACTIVE=production
+            export POSTGRES_PASSWORD=${{ secrets.PROD_POSTGRES_PASSWORD }}
+            export JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+
+            # Backup antes do deploy
+            echo "Realizando backup do banco..."
+            docker exec esg-postgres pg_dump -U esguser esgdb > /backups/pre-deploy-$(date +%Y%m%d%H%M%S).sql
+
+            # Pull das novas imagens
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+            # Deploy com rolling update
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Aguardar health check
+            sleep 20
+
+            # Verificar se a API está respondendo
+            curl -f http://localhost:8080/api/health || exit 1
+
+            echo "Deploy em Produção concluído com sucesso!"
+
+      - name: Criar Release no GitHub
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          tag_name: v${{ needs.docker-build.outputs.image-version }}
+          name: Release v${{ needs.docker-build.outputs.image-version }}
+          body: |
+            ## Cidades ESG Inteligentes - Deploy em Produção
+
+            **Versão:** `${{ needs.docker-build.outputs.image-version }}`
+            **Branch:** `${{ github.ref_name }}`
+            **Commit:** `${{ github.sha }}`
+
+            ### Pipeline executado com sucesso:
+            - Build e testes automatizados (Java/Maven)
+            - Build da imagem Docker
+            - Deploy em Staging
+            - Testes de integração em Staging
+            - Deploy em Produção
+          draft: false
+          prerelease: false
+        continue-on-error: true

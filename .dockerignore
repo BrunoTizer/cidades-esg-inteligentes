@@ -1,0 +1,14 @@
+target/
+.git
+.github
+*.md
+docker-compose*.yml
+nginx/
+monitoring/
+scripts/
+.gitignore
+.dockerignore
+.env
+*.log
+.idea/
+*.iml

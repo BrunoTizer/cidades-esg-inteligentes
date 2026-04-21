@@ -1,0 +1,36 @@
+version: '3.9'
+
+# Override para ambiente de PRODUÇÃO
+# Uso: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+  api:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/cidades-esg-api:${APP_VERSION:-latest}
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      APP_VERSION: ${APP_VERSION}
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+        max_attempts: 5
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.25'
+          memory: 384M
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: []  # Nunca expor BD em produção
+
+  redis:
+    ports: []  # Nunca expor cache em produção
+
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"

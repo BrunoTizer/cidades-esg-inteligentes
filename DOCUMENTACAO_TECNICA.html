@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Documentação Técnica - Cidades ESG Inteligentes</title>
+<style>
+  @page { size: A4; margin: 18mm 15mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: #222;
+    line-height: 1.55;
+    margin: 0;
+    padding: 0;
+    font-size: 11pt;
+  }
+  .container { max-width: 800px; margin: 0 auto; padding: 0 10px; }
+
+  .cover {
+    text-align: center;
+    padding: 60px 20px 40px;
+    border-bottom: 4px solid #2d6a4f;
+    margin-bottom: 30px;
+    page-break-after: always;
+  }
+  .cover .emoji { font-size: 72px; }
+  .cover h1 { font-size: 32pt; color: #2d6a4f; margin: 10px 0 5px; }
+  .cover h2 { font-size: 14pt; color: #555; font-weight: 400; margin-top: 0; }
+  .cover .meta { margin-top: 50px; font-size: 12pt; }
+  .cover .group { margin-top: 40px; padding: 20px; background: #f0f7f4; border-left: 5px solid #2d6a4f; text-align: left; }
+
+  h1 { color: #2d6a4f; border-bottom: 2px solid #2d6a4f; padding-bottom: 5px; margin-top: 35px; font-size: 20pt; page-break-after: avoid; }
+  h2 { color: #1b4332; margin-top: 25px; font-size: 15pt; page-break-after: avoid; }
+  h3 { color: #40916c; margin-top: 18px; font-size: 12pt; page-break-after: avoid; }
+
+  p { margin: 8px 0; text-align: justify; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 20px; font-size: 10pt; page-break-inside: avoid; }
+  th, td { padding: 8px 10px; border: 1px solid #ccc; text-align: left; }
+  th { background: #2d6a4f; color: white; }
+  tr:nth-child(even) { background: #f9f9f9; }
+
+  pre, code { font-family: 'Consolas', 'Courier New', monospace; }
+  pre {
+    background: #1e1e1e; color: #d4d4d4;
+    padding: 14px 16px; border-radius: 6px;
+    font-size: 9pt; line-height: 1.5;
+    overflow-x: auto; white-space: pre-wrap;
+    page-break-inside: avoid;
+  }
+  code.inline { background: #eef2ef; color: #1b4332; padding: 2px 6px; border-radius: 4px; font-size: 9.5pt; }
+
+  .comment { color: #6a9955; }
+  .keyword { color: #569cd6; }
+  .string { color: #ce9178; }
+
+  .screenshot {
+    margin: 15px 0;
+    text-align: center;
+    page-break-inside: avoid;
+  }
+  .screenshot img {
+    max-width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+  .screenshot .caption {
+    font-size: 9.5pt; color: #666;
+    margin-top: 6px; font-style: italic;
+  }
+
+  .callout {
+    background: #fff8dc; border-left: 5px solid #f59e0b;
+    padding: 12px 16px; margin: 15px 0;
+    border-radius: 4px;
+    page-break-inside: avoid;
+  }
+  .callout strong { color: #92400e; }
+
+  .success { background: #d1fae5; border-left: 5px solid #10b981; padding: 12px 16px; margin: 10px 0; border-radius: 4px; }
+  .success strong { color: #065f46; }
+
+  .page-break { page-break-before: always; }
+  .ascii-diagram { font-family: 'Consolas', monospace; font-size: 8.5pt; line-height: 1.35; white-space: pre; background: #f5f5f5; padding: 15px; border-radius: 6px; border: 1px solid #ddd; }
+
+  .checklist-table td:last-child { text-align: center; font-size: 14pt; color: #10b981; font-weight: bold; }
+
+  @media print {
+    body { font-size: 10pt; }
+    .screenshot img { max-height: 220px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- CAPA -->
+<div class="cover">
+  <div class="emoji">🌱</div>
+  <h1>Cidades ESG Inteligentes</h1>
+  <h2>Documentação Técnica — DevOps & Containerização</h2>
+
+  <div class="meta">
+    <strong>FIAP — Fase 6: Navegando pelo mundo DevOps</strong><br>
+    Atividade: Aplicando Técnicas de DevOps<br>
+    Grupo 118 — Abril de 2026
+  </div>
+
+  <div class="group">
+    <strong style="font-size: 13pt; color: #2d6a4f;">Integrantes do Grupo 118</strong>
+    <ul style="list-style: none; padding-left: 0; margin-top: 10px;">
+      <li>• Natália de Oliveira Santos — natalia.o.santos.00@gmail.com</li>
+      <li>• Gabriel dos Santos Souza — gabriel292603@gmail.com</li>
+      <li>• Thomas Henrique Baúte — baute.thomas25@gmail.com</li>
+      <li>• Bruno Mateus Tizer das Chagas — brunotizer@icloud.com</li>
+      <li>• Felipe Olecsiuc Damasceno — patcho.olec@gmail.com</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ====== 1. VISÃO GERAL ====== -->
+<h1>1. Visão Geral do Projeto</h1>
+
+<p>
+O <strong>Cidades ESG Inteligentes</strong> é uma API REST desenvolvida em <strong>Java 21 + Spring Boot 3.2.5</strong>
+para monitoramento de indicadores ESG (Environmental, Social & Governance) em cidades brasileiras.
+Esta entrega foca em integrar práticas completas de DevOps: containerização com Docker multi-stage,
+orquestração via Docker Compose com overrides por ambiente (dev/staging/prod) e pipeline CI/CD funcional no GitHub Actions.
+</p>
+
+<h3>Arquitetura de alto nível</h3>
+<div class="ascii-diagram">
+┌────────────────────────────────────────────────────────────┐
+│                  esg-network (bridge)                      │
+│                                                            │
+│    ┌────────┐      ┌─────────────────┐                     │
+│    │ NGINX  │─────▶│  API Spring Boot│  (Java 21 / JRE)   │
+│    │ 80/443 │      │      :8080      │                     │
+│    └────────┘      └────────┬────────┘                     │
+│                             │                              │
+│                   ┌─────────┴─────────┐                    │
+│                   ▼                   ▼                    │
+│             ┌──────────┐         ┌─────────┐               │
+│             │ Postgres │         │  Redis  │               │
+│             │   :5432  │         │  :6379  │               │
+│             └──────────┘         └─────────┘               │
+│                                                            │
+│     + Prometheus :9090  + Grafana :3001  (profile mon.)   │
+└────────────────────────────────────────────────────────────┘
+</div>
+
+<!-- ====== 2. PIPELINE CI/CD ====== -->
+<h1>2. Pipeline CI/CD — GitHub Actions</h1>
+
+<p>
+A ferramenta escolhida foi o <strong>GitHub Actions</strong> pela integração nativa com o repositório,
+pelo GitHub Container Registry (<code class="inline">ghcr.io</code>) gratuito para imagens Docker,
+e pelo modelo declarativo em YAML. O arquivo <code class="inline">.github/workflows/ci-cd.yml</code>
+define cinco jobs encadeados, executados em agentes <code class="inline">ubuntu-latest</code>.
+</p>
+
+<h2>2.1 Etapas do pipeline</h2>
+<table>
+  <tr><th>#</th><th>Job</th><th>Responsabilidade</th><th>Dispara em</th></tr>
+  <tr><td>1</td><td><strong>build-and-test</strong></td><td><code class="inline">mvn verify -B</code> — compila e executa os 11 testes JUnit. Publica relatório Surefire e cobertura no Codecov.</td><td>Todos os pushes e PRs</td></tr>
+  <tr><td>2</td><td><strong>docker-build</strong></td><td>Build multi-stage da imagem, push para <code class="inline">ghcr.io</code> com tags <code class="inline">sha</code>, branch e <code class="inline">latest</code>. Usa cache de layers GHA.</td><td>Depois do job 1</td></tr>
+  <tr><td>3</td><td><strong>deploy-staging</strong></td><td>SSH no servidor de staging, <code class="inline">docker compose pull</code> + <code class="inline">up -d</code> com override <code class="inline">docker-compose.staging.yml</code>.</td><td>Branches <code class="inline">develop</code> ou <code class="inline">main</code></td></tr>
+  <tr><td>4</td><td><strong>integration-tests-staging</strong></td><td>Smoke tests via <code class="inline">curl</code> em todos os endpoints da URL de staging.</td><td>Depois do job 3</td></tr>
+  <tr><td>5</td><td><strong>deploy-production</strong></td><td>Backup do Postgres com <code class="inline">pg_dump</code>, deploy via SSH com override de produção, cria Release no GitHub.</td><td>Somente branch <code class="inline">main</code></td></tr>
+</table>
+
+<h2>2.2 Lógica do pipeline</h2>
+<div class="ascii-diagram">
+   Push / Pull Request
+          │
+          ▼
+  ┌───────────────────────┐
+  │ 1. Build & Testes     │  mvn verify (11 testes JUnit)
+  │    (obrigatório)      │
+  └──────────┬────────────┘
+             ▼
+  ┌───────────────────────┐
+  │ 2. Docker Build+Push  │  multi-stage → ghcr.io
+  │    (tags: sha, latest)│
+  └──────────┬────────────┘
+             │  [develop | main]
+             ▼
+  ┌───────────────────────┐
+  │ 3. Deploy Staging     │  SSH + docker compose (staging)
+  │    smoke-test saúde   │
+  └──────────┬────────────┘
+             ▼
+  ┌───────────────────────┐
+  │ 4. Integration Tests  │  curl em endpoints públicos
+  └──────────┬────────────┘
+             │  [main]
+             ▼
+  ┌───────────────────────┐
+  │ 5. Deploy Produção    │  pg_dump + docker compose (prod)
+  │    + GitHub Release   │
+  └───────────────────────┘
+</div>
+
+<div class="callout">
+<strong>Proteção por branch:</strong> staging só dispara para <code class="inline">develop</code> e <code class="inline">main</code>;
+produção é exclusiva da <code class="inline">main</code>. Secrets específicos por ambiente (<code class="inline">STAGING_*</code> e <code class="inline">PROD_*</code>)
+isolam as credenciais.
+</div>
+
+<!-- ====== 3. DOCKER ====== -->
+<h1 class="page-break">3. Docker — Arquitetura e Estratégias</h1>
+
+<h2>3.1 Dockerfile Multi-Stage</h2>
+<p>O <code class="inline">Dockerfile</code> usa duas etapas: uma imagem <em>builder</em> pesada com Maven e JDK completo apenas para compilar e empacotar, e uma imagem final <em>production</em> com apenas o JRE 21 Alpine, reduzindo drasticamente o tamanho e a superfície de ataque.</p>
+
+<pre><span class="comment"># Stage 1 — Builder: compila, empacota e executa testes</span>
+<span class="keyword">FROM</span> maven:3.9-eclipse-temurin-21-alpine <span class="keyword">AS</span> builder
+<span class="keyword">WORKDIR</span> /app
+<span class="keyword">COPY</span> pom.xml .
+<span class="keyword">RUN</span> mvn dependency:go-offline -B
+<span class="keyword">COPY</span> src ./src
+<span class="keyword">RUN</span> mvn package -B                   <span class="comment"># ← executa os 11 testes</span>
+
+<span class="comment"># Stage 2 — Production: somente JRE + JAR</span>
+<span class="keyword">FROM</span> eclipse-temurin:21-jre-alpine <span class="keyword">AS</span> production
+<span class="keyword">RUN</span> addgroup -S appgroup && adduser -S appuser -G appgroup
+<span class="keyword">WORKDIR</span> /app
+<span class="keyword">COPY</span> --from=builder --chown=appuser:appgroup /app/target/*.jar app.jar
+<span class="keyword">USER</span> appuser                        <span class="comment"># ← não-root</span>
+<span class="keyword">EXPOSE</span> 8080
+<span class="keyword">HEALTHCHECK</span> --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/health || exit 1
+<span class="keyword">ENTRYPOINT</span> [<span class="string">"java"</span>, <span class="string">"-jar"</span>, <span class="string">"app.jar"</span>]</pre>
+
+<h2>3.2 Imagem criada</h2>
+<table>
+  <tr><th>Propriedade</th><th>Valor</th></tr>
+  <tr><td>Nome local</td><td><code class="inline">cidades-esg-api:latest</code></td></tr>
+  <tr><td>Registry oficial</td><td><code class="inline">ghcr.io/&lt;owner&gt;/cidades-esg-api</code></td></tr>
+  <tr><td>Tamanho final</td><td>~323 MB (JRE 21 Alpine + JAR fat)</td></tr>
+  <tr><td>Base OS</td><td>Alpine Linux 3.x</td></tr>
+  <tr><td>Runtime</td><td>Eclipse Temurin JRE 21</td></tr>
+  <tr><td>Usuário</td><td><code class="inline">appuser</code> (UID não-root)</td></tr>
+</table>
+
+<h2>3.3 Comandos principais</h2>
+<pre><span class="comment"># Subir ambiente de desenvolvimento completo</span>
+docker compose up -d --build
+
+<span class="comment"># Verificar status e saúde dos containers</span>
+docker compose ps
+
+<span class="comment"># Logs em tempo real da API</span>
+docker compose logs -f api
+
+<span class="comment"># Subir em ambiente de staging</span>
+docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+
+<span class="comment"># Subir em ambiente de produção</span>
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+<span class="comment"># Incluir stack de monitoramento (Prometheus + Grafana)</span>
+docker compose --profile monitoring up -d
+
+<span class="comment"># Derrubar tudo (preservando volumes)</span>
+docker compose down</pre>
+
+<h2>3.4 Recursos Compose adotados</h2>
+<ul>
+  <li><strong>Volumes nomeados:</strong> <code class="inline">esg-postgres-data</code>, <code class="inline">esg-redis-data</code>, <code class="inline">esg-prometheus-data</code> — persistem dados entre restarts.</li>
+  <li><strong>Rede bridge dedicada:</strong> <code class="inline">esg-network</code> isola a comunicação entre serviços.</li>
+  <li><strong>Variáveis de ambiente:</strong> <code class="inline">.env.example</code> como template, carregadas pelo Compose com defaults seguros.</li>
+  <li><strong>Healthchecks:</strong> API, Postgres e Redis; <code class="inline">depends_on.condition: service_healthy</code> garante ordem correta.</li>
+  <li><strong>Overrides por ambiente:</strong> <code class="inline">docker-compose.staging.yml</code> (2 réplicas) e <code class="inline">docker-compose.prod.yml</code> (3 réplicas + resource limits de CPU e memória).</li>
+</ul>
+
+<!-- ====== 4. EVIDÊNCIAS ====== -->
+<h1 class="page-break">4. Evidências de Execução</h1>
+
+<h2>4.1 Pipeline — Build e testes (mvn verify)</h2>
+
+<div class="screenshot">
+  <img src="public/print-08-docker-testes.png" alt="Resultado mvn verify">
+  <div class="caption">Resultado consolidado: <strong>11 testes JUnit passando</strong>, 4 containers saudáveis e arquitetura Docker Compose.</div>
+</div>
+
+<div class="success">
+<strong>BUILD SUCCESS</strong> — Tests run: 11, Failures: 0, Errors: 0, Skipped: 0 — Time elapsed: 2.953 s
+</div>
+
+<h2>4.2 Aplicação em execução</h2>
+
+<div class="screenshot">
+  <img src="public/print-01-root.png" alt="GET /">
+  <div class="caption"><code class="inline">GET /</code> — metadados do projeto (nome, versão, ambiente).</div>
+</div>
+
+<div class="screenshot">
+  <img src="public/print-02-health.png" alt="Health check">
+  <div class="caption"><code class="inline">GET /api/health</code> — status ok, uptime em segundos, timestamp ISO-8601.</div>
+</div>
+
+<div class="screenshot">
+  <img src="public/print-03-cidades.png" alt="Cidades">
+  <div class="caption"><code class="inline">GET /api/cidades</code> — lista com 5 cidades brasileiras.</div>
+</div>
+
+<div class="screenshot">
+  <img src="public/print-04-indicadores.png" alt="Indicadores">
+  <div class="caption"><code class="inline">GET /api/indicadores</code> — 5 indicadores ESG (Ambiental, Social, Governança).</div>
+</div>
+
+<div class="screenshot">
+  <img src="public/print-05-resumo.png" alt="Resumo">
+  <div class="caption"><code class="inline">GET /api/indicadores/resumo/geral</code> — estatísticas consolidadas.</div>
+</div>
+
+<div class="screenshot">
+  <img src="public/print-06-404.png" alt="404">
+  <div class="caption">Tratamento de erro: <strong>HTTP 404</strong> para ID inexistente.</div>
+</div>
+
+<div class="screenshot">
+  <img src="public/print-07-nginx.png" alt="Via Nginx">
+  <div class="caption">Acesso via Nginx (<code class="inline">http://localhost:80</code>) — proxy reverso operando.</div>
+</div>
+
+<h2>4.3 Ambientes Staging e Produção</h2>
+
+<div class="screenshot">
+  <img src="public/print-09-staging.png" alt="Staging">
+  <div class="caption">
+    <strong>Staging:</strong> <code class="inline">docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d</code><br>
+    API retornando <code class="inline">"ambiente":"staging"</code>.
+  </div>
+</div>
+
+<div class="screenshot">
+  <img src="public/print-10-production.png" alt="Production">
+  <div class="caption">
+    <strong>Produção:</strong> <code class="inline">docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d</code><br>
+    API retornando <code class="inline">"ambiente":"production"</code>.
+  </div>
+</div>
+
+<!-- ====== 5. DESAFIOS ====== -->
+<h1 class="page-break">5. Desafios Encontrados e Soluções</h1>
+
+<h2>Desafio 1 — Adequação da stack ao requisito do projeto</h2>
+<p><strong>Problema:</strong> O enunciado exigia o uso de projeto base em <strong>Java Spring</strong> ou <strong>C#</strong>. Uma versão inicial estava em Node.js e precisou ser migrada preservando a mesma API pública.</p>
+<p><strong>Solução:</strong> Reescrita completa do backend com Java 21 + Spring Boot 3.2.5. Utilizamos <code class="inline">records</code> para os modelos (Cidade, Indicador, ResumoGeral) e <code class="inline">@RestController</code> para manter os mesmos endpoints. Os 11 testes foram reescritos com <code class="inline">@SpringBootTest</code> + <code class="inline">MockMvc</code>, mantendo paridade funcional total.</p>
+
+<h2>Desafio 2 — Troca do Dockerfile de Node.js para Maven/JRE</h2>
+<p><strong>Problema:</strong> O Dockerfile original usava <code class="inline">node:20-alpine</code> com <code class="inline">npm ci</code>. Precisou ser reescrito preservando as boas práticas (multi-stage, usuário não-root, healthcheck).</p>
+<p><strong>Solução:</strong> Stage 1 com <code class="inline">maven:3.9-eclipse-temurin-21-alpine</code> faz <code class="inline">mvn dependency:go-offline</code> <em>antes</em> de copiar o <code class="inline">src/</code>, permitindo cache de layers. Stage 2 com <code class="inline">eclipse-temurin:21-jre-alpine</code> contém apenas o JAR fat. Mantivemos <code class="inline">appuser</code> não-root e <code class="inline">HEALTHCHECK</code> apontando para <code class="inline">/api/health</code>.</p>
+
+<h2>Desafio 3 — Conflito replicas × container_name no Compose</h2>
+<p><strong>Problema:</strong> Ao rodar staging/prod localmente com <code class="inline">deploy.replicas: 2/3</code>, o Docker Compose lançava o erro <em>"can't set container_name and api as container name must be unique"</em> porque réplicas exigem nomes dinâmicos.</p>
+<p><strong>Solução:</strong> Para a demonstração local dos ambientes, rodamos com <code class="inline">SPRING_PROFILES_ACTIVE=staging/production</code> via variável de ambiente do shell, evidenciando que a API reconhece corretamente cada perfil. Em produção real com Docker Swarm ou Kubernetes, o campo <code class="inline">container_name</code> seria removido.</p>
+
+<h2>Desafio 4 — Start-period longo do Spring Boot</h2>
+<p><strong>Problema:</strong> O Spring Boot leva ~15–25 s para inicializar, o que fazia o <code class="inline">HEALTHCHECK</code> reportar <em>unhealthy</em> durante a partida.</p>
+<p><strong>Solução:</strong> Aumentamos o <code class="inline">start_period</code> do healthcheck de 15s para 30s tanto no Dockerfile quanto no <code class="inline">docker-compose.yml</code>, dando margem para o warmup da JVM.</p>
+
+<h2>Desafio 5 — Encoding UTF-8 em dados com acentos</h2>
+<p><strong>Problema:</strong> Cidades como "São Paulo", "Florianópolis" e a categoria "Governança" apareciam com caracteres estranhos em algumas ferramentas de formatação JSON.</p>
+<p><strong>Solução:</strong> Spring Boot entrega UTF-8 por padrão (verificado via <code class="inline">curl</code> direto). Usamos <code class="inline">application.properties</code> padrão e mantivemos os arquivos <code class="inline">.java</code> com encoding UTF-8.</p>
+
+<!-- ====== 6. CHECKLIST ====== -->
+<h1>6. Checklist de Entrega</h1>
+
+<table class="checklist-table">
+  <tr><th>Item</th><th>OK</th></tr>
+  <tr><td>Projeto compactado em .ZIP com estrutura organizada</td><td>✅</td></tr>
+  <tr><td>Dockerfile funcional (multi-stage Java/Maven)</td><td>✅</td></tr>
+  <tr><td>docker-compose.yml com todos os serviços + overrides de staging e produção</td><td>✅</td></tr>
+  <tr><td>Pipeline com etapas de build, teste e deploy (5 jobs)</td><td>✅</td></tr>
+  <tr><td>README.md com instruções e prints</td><td>✅</td></tr>
+  <tr><td>Documentação técnica com evidências (este PDF)</td><td>✅</td></tr>
+  <tr><td>Deploy realizado nos ambientes staging e produção</td><td>✅</td></tr>
+</table>
+
+<h1>7. Tecnologias Utilizadas</h1>
+<table>
+  <tr><th>Categoria</th><th>Tecnologia</th><th>Versão</th></tr>
+  <tr><td>Linguagem</td><td>Java</td><td>21</td></tr>
+  <tr><td>Framework</td><td>Spring Boot</td><td>3.2.5</td></tr>
+  <tr><td>Build</td><td>Maven</td><td>3.9</td></tr>
+  <tr><td>Testes</td><td>JUnit 5 + Spring MockMvc</td><td>5.x</td></tr>
+  <tr><td>Containerização</td><td>Docker</td><td>24+</td></tr>
+  <tr><td>Orquestração</td><td>Docker Compose</td><td>v3.9</td></tr>
+  <tr><td>CI/CD</td><td>GitHub Actions</td><td>—</td></tr>
+  <tr><td>Banco de Dados</td><td>PostgreSQL</td><td>15-alpine</td></tr>
+  <tr><td>Cache</td><td>Redis</td><td>7-alpine</td></tr>
+  <tr><td>Proxy Reverso</td><td>Nginx</td><td>alpine</td></tr>
+  <tr><td>Monitoramento</td><td>Prometheus + Grafana</td><td>latest</td></tr>
+  <tr><td>Registry</td><td>GitHub Container Registry</td><td>ghcr.io</td></tr>
+</table>
+
+<p style="text-align: center; margin-top: 60px; color: #888; font-size: 9.5pt;">
+Grupo 118 — FIAP Fase 6 — Entrega realizada em 21 de Abril de 2026
+</p>
+
+</div>
+</body>
+</html>
