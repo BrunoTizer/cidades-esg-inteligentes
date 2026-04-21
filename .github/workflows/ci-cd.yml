@@ -13,16 +13,20 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/cidades-esg-api
+  IMAGE_OWNER: brunotizer
+  IMAGE_NAME: brunotizer/cidades-esg-api
   JAVA_VERSION: '21'
 
 jobs:
   # ============================================================
-  # JOB 1: BUILD E TESTES
+  # JOB 1: BUILD E TESTES (Maven)
   # ============================================================
   build-and-test:
     name: Build e Testes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - name: Checkout do código
@@ -47,15 +51,8 @@ jobs:
           reporter: java-junit
         continue-on-error: true
 
-      - name: Upload cobertura de código
-        uses: codecov/codecov-action@v4
-        with:
-          directory: ./target/site/jacoco
-          flags: unittests
-        continue-on-error: true
-
   # ============================================================
-  # JOB 2: BUILD DA IMAGEM DOCKER
+  # JOB 2: BUILD E PUSH DA IMAGEM DOCKER (ghcr.io)
   # ============================================================
   docker-build:
     name: Build Docker Image
@@ -66,7 +63,6 @@ jobs:
       packages: write
 
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
       image-version: ${{ steps.version.outputs.version }}
 
     steps:
@@ -110,59 +106,76 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          build-args: |
-            APP_VERSION=${{ steps.version.outputs.version }}
 
   # ============================================================
-  # JOB 3: DEPLOY EM STAGING
+  # JOB 3: DEPLOY EM STAGING (VM Azure)
   # ============================================================
   deploy-staging:
     name: Deploy - Staging
     runs-on: ubuntu-latest
     needs: docker-build
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    permissions:
+      packages: read
     environment:
       name: staging
-      url: https://staging.cidades-esg.exemplo.com
+      url: http://51.120.75.55:8081/
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
       - name: Deploy em Staging via SSH
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
+          script_stop: true
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
-            cd /opt/cidades-esg
-            export APP_VERSION=${{ needs.docker-build.outputs.image-version }}
-            export SPRING_PROFILES_ACTIVE=staging
-            export POSTGRES_PASSWORD=${{ secrets.STAGING_POSTGRES_PASSWORD }}
-            export JWT_SECRET=${{ secrets.STAGING_JWT_SECRET }}
+            set -e
+            cd /opt/cidades-esg-staging
 
-            # Pull das novas imagens
-            docker compose -f docker-compose.yml -f docker-compose.staging.yml pull
+            # Baixar os compose files atualizados do repositório
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/docker-compose.yml -o docker-compose.yml
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/docker-compose.staging.yml -o docker-compose.staging.yml
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/nginx/nginx.conf -o nginx/nginx.conf
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/scripts/init-db.sql -o scripts/init-db.sql
 
-            # Deploy com zero downtime
-            docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans
+            # Login no GHCR usando o GITHUB_TOKEN do workflow (scope packages:read)
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
-            # Aguardar health check
-            sleep 15
-            docker compose ps
+            # Variáveis do ambiente staging
+            export APP_VERSION="sha-${{ needs.docker-build.outputs.image-version }}"
+            export IMAGE_OWNER="brunotizer"
+            export POSTGRES_PASSWORD="${{ secrets.STAGING_POSTGRES_PASSWORD }}"
+            export JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}"
+            export REDIS_PASSWORD="staging_redis_pwd"
 
-            # Verificar se a API está respondendo
-            curl -f http://localhost:8080/api/health || exit 1
+            echo "Deploy em Staging — versão $APP_VERSION"
 
-            echo "Deploy em Staging concluído com sucesso!"
+            docker compose -p esg-staging -f docker-compose.yml -f docker-compose.staging.yml pull
+            docker compose -p esg-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans
 
-      - name: Notificar resultado do deploy em Staging
-        if: always()
-        run: |
-          echo "Deploy em Staging: ${{ job.status }}"
-          echo "Versão: ${{ needs.docker-build.outputs.image-version }}"
-          echo "Ambiente: https://staging.cidades-esg.exemplo.com"
+            echo "Aguardando API ficar saudável..."
+            for i in $(seq 1 40); do
+              if curl -sf http://localhost:8081/api/health > /dev/null; then
+                echo "Staging OK!"
+                break
+              fi
+              sleep 3
+            done
+
+            echo ""
+            echo "=== Containers Staging ==="
+            docker compose -p esg-staging ps
+
+            echo ""
+            echo "=== Smoke test Staging ==="
+            curl -sf http://localhost:8081/api/health
+            echo ""
+            curl -sf http://localhost:8081/ | head -c 300
 
   # ============================================================
   # JOB 4: TESTES DE INTEGRAÇÃO EM STAGING
@@ -171,98 +184,126 @@ jobs:
     name: Testes de Integração - Staging
     runs-on: ubuntu-latest
     needs: deploy-staging
-    environment:
-      name: staging
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Executar smoke tests em Staging
+      - name: Smoke tests públicos em Staging
         run: |
-          BASE_URL="https://staging.cidades-esg.exemplo.com"
-
+          BASE_URL="http://51.120.75.55:8081"
           echo "Testando endpoint raiz..."
-          curl -f "$BASE_URL/" || exit 1
-
+          curl -f "$BASE_URL/"
+          echo ""
           echo "Testando health check..."
-          curl -f "$BASE_URL/api/health" || exit 1
-
+          curl -f "$BASE_URL/api/health"
+          echo ""
           echo "Testando API de cidades..."
-          curl -f "$BASE_URL/api/cidades" || exit 1
-
+          curl -f "$BASE_URL/api/cidades" | head -c 300
+          echo ""
           echo "Testando API de indicadores..."
-          curl -f "$BASE_URL/api/indicadores" || exit 1
-
-          echo "Todos os smoke tests passaram em Staging!"
-        continue-on-error: true
+          curl -f "$BASE_URL/api/indicadores" | head -c 300
+          echo ""
+          echo "Testando resumo..."
+          curl -f "$BASE_URL/api/indicadores/resumo/geral"
+          echo ""
+          echo "Todos os smoke tests em Staging passaram!"
 
   # ============================================================
-  # JOB 5: DEPLOY EM PRODUÇÃO
+  # JOB 5: DEPLOY EM PRODUÇÃO (VM Azure)
   # ============================================================
   deploy-production:
     name: Deploy - Produção
     runs-on: ubuntu-latest
     needs: [docker-build, integration-tests-staging]
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      packages: read
     environment:
       name: production
-      url: https://cidades-esg.exemplo.com
+      url: http://51.120.75.55:8082/
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
       - name: Deploy em Produção via SSH
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         with:
           host: ${{ secrets.PROD_HOST }}
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
+          script_stop: true
+          envs: GHCR_TOKEN,GHCR_USER
           script: |
-            cd /opt/cidades-esg
-            export APP_VERSION=${{ needs.docker-build.outputs.image-version }}
-            export SPRING_PROFILES_ACTIVE=production
-            export POSTGRES_PASSWORD=${{ secrets.PROD_POSTGRES_PASSWORD }}
-            export JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+            set -e
+            cd /opt/cidades-esg-prod
 
-            # Backup antes do deploy
-            echo "Realizando backup do banco..."
-            docker exec esg-postgres pg_dump -U esguser esgdb > /backups/pre-deploy-$(date +%Y%m%d%H%M%S).sql
+            # Baixar os compose files atualizados
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/docker-compose.yml -o docker-compose.yml
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/docker-compose.prod.yml -o docker-compose.prod.yml
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/nginx/nginx.conf -o nginx/nginx.conf
+            curl -sSL https://raw.githubusercontent.com/BrunoTizer/cidades-esg-inteligentes/main/scripts/init-db.sql -o scripts/init-db.sql
 
-            # Pull das novas imagens
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            # Login no GHCR usando GITHUB_TOKEN
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
-            # Deploy com rolling update
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            # Backup do banco antes do deploy (se container existir)
+            if docker ps --format '{{.Names}}' | grep -q 'esg-prod-postgres'; then
+              BACKUP_FILE=/backups/prod-$(date +%Y%m%d-%H%M%S).sql
+              echo "Backup do banco em $BACKUP_FILE"
+              docker exec $(docker ps -qf name=esg-prod-postgres) pg_dump -U esguser esgdb > $BACKUP_FILE || true
+            fi
 
-            # Aguardar health check
-            sleep 20
+            # Variáveis de produção
+            export APP_VERSION="sha-${{ needs.docker-build.outputs.image-version }}"
+            export IMAGE_OWNER="brunotizer"
+            export POSTGRES_PASSWORD="${{ secrets.PROD_POSTGRES_PASSWORD }}"
+            export JWT_SECRET="${{ secrets.PROD_JWT_SECRET }}"
+            export REDIS_PASSWORD="prod_redis_pwd"
 
-            # Verificar se a API está respondendo
-            curl -f http://localhost:8080/api/health || exit 1
+            echo "Deploy em Produção — versão $APP_VERSION"
 
-            echo "Deploy em Produção concluído com sucesso!"
+            docker compose -p esg-prod -f docker-compose.yml -f docker-compose.prod.yml pull
+            docker compose -p esg-prod -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo "Aguardando API ficar saudável em PRODUÇÃO..."
+            for i in $(seq 1 40); do
+              if curl -sf http://localhost:8082/api/health > /dev/null; then
+                echo "Produção OK!"
+                break
+              fi
+              sleep 3
+            done
+
+            echo ""
+            echo "=== Containers Produção ==="
+            docker compose -p esg-prod ps
+
+            echo ""
+            echo "=== Validação final em Produção ==="
+            curl -sf http://localhost:8082/api/health
+            echo ""
+            INFO=$(curl -sf http://localhost:8082/)
+            echo "$INFO"
+            if ! echo "$INFO" | grep -q '"ambiente":"production"'; then
+              echo "ERRO: Ambiente retornado não é production!"
+              exit 1
+            fi
+            echo "Deploy em produção validado!"
 
       - name: Criar Release no GitHub
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/heads/main')
         with:
-          tag_name: v${{ needs.docker-build.outputs.image-version }}
-          name: Release v${{ needs.docker-build.outputs.image-version }}
+          tag_name: release-${{ needs.docker-build.outputs.image-version }}
+          name: Release ${{ needs.docker-build.outputs.image-version }}
           body: |
-            ## Cidades ESG Inteligentes - Deploy em Produção
+            ## Deploy em Produção — Cidades ESG Inteligentes
 
-            **Versão:** `${{ needs.docker-build.outputs.image-version }}`
-            **Branch:** `${{ github.ref_name }}`
             **Commit:** `${{ github.sha }}`
+            **Imagem:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ needs.docker-build.outputs.image-version }}`
+            **Ambiente Staging:** http://51.120.75.55:8081/
+            **Ambiente Produção:** http://51.120.75.55:8082/
 
-            ### Pipeline executado com sucesso:
-            - Build e testes automatizados (Java/Maven)
-            - Build da imagem Docker
-            - Deploy em Staging
-            - Testes de integração em Staging
-            - Deploy em Produção
+            Pipeline completo: build → testes (11) → imagem Docker → staging → integração → produção.
           draft: false
           prerelease: false
         continue-on-error: true

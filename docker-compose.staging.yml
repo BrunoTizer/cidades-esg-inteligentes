@@ -1,24 +1,22 @@
-version: '3.9'
-
 # Override para ambiente de STAGING
-# Uso: docker compose -f docker-compose.yml -f docker-compose.staging.yml up
+# Uso: docker compose -p esg-staging -f docker-compose.yml -f docker-compose.staging.yml up -d
+# Expõe a API via Nginx na porta 8081 do host.
 
 services:
   api:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/cidades-esg-api:${APP_VERSION:-staging}
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${IMAGE_OWNER:-brunotizer}/cidades-esg-api:${APP_VERSION:-latest}
+    pull_policy: always
     environment:
       SPRING_PROFILES_ACTIVE: staging
       APP_VERSION: ${APP_VERSION:-staging}
-    deploy:
-      replicas: 2
-      restart_policy:
-        condition: on-failure
-        max_attempts: 3
+    ports: []  # expomos apenas via Nginx
+
+  nginx:
+    ports:
+      - "8081:80"
 
   postgres:
-    environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports: []  # Não expor porta em staging
+    ports: []
 
   redis:
-    ports: []  # Não expor porta em staging
+    ports: []

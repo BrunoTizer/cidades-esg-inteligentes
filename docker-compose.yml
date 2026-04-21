@@ -1,25 +1,24 @@
 
 # ==================================================
 # Cidades ESG Inteligentes - Docker Compose
+# Use `-p esg-<ambiente>` para isolar os stacks na mesma máquina:
+#   docker compose -p esg-staging up -d
+#   docker compose -p esg-prod up -d
 # ==================================================
 
 networks:
   esg-network:
     driver: bridge
-    name: esg-network
 
 volumes:
   postgres-data:
-    name: esg-postgres-data
   redis-data:
-    name: esg-redis-data
   prometheus-data:
-    name: esg-prometheus-data
 
 services:
 
   # ------------------------------------------------
-  # API Principal
+  # API Principal (Java Spring Boot)
   # ------------------------------------------------
   api:
     build:
@@ -27,7 +26,6 @@ services:
       dockerfile: Dockerfile
       target: production
     image: cidades-esg-api:${APP_VERSION:-latest}
-    container_name: esg-api
     restart: unless-stopped
     ports:
       - "${API_PORT:-8080}:8080"
@@ -60,7 +58,6 @@ services:
   # ------------------------------------------------
   postgres:
     image: postgres:15-alpine
-    container_name: esg-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-esguser}
@@ -70,8 +67,6 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - esg-network
     healthcheck:
@@ -89,13 +84,10 @@ services:
   # ------------------------------------------------
   redis:
     image: redis:7-alpine
-    container_name: esg-redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD:-redispass} --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     networks:
       - esg-network
     healthcheck:
@@ -112,14 +104,11 @@ services:
   # ------------------------------------------------
   nginx:
     image: nginx:alpine
-    container_name: esg-nginx
     restart: unless-stopped
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
-      - "${NGINX_HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
     depends_on:
       - api
     networks:
@@ -129,11 +118,10 @@ services:
       - "com.servico=proxy"
 
   # ------------------------------------------------
-  # Prometheus (Monitoramento)
+  # Prometheus (perfil 'monitoring')
   # ------------------------------------------------
   prometheus:
     image: prom/prometheus:latest
-    container_name: esg-prometheus
     restart: unless-stopped
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -149,11 +137,10 @@ services:
       - monitoring
 
   # ------------------------------------------------
-  # Grafana (Dashboards)
+  # Grafana (perfil 'monitoring')
   # ------------------------------------------------
   grafana:
     image: grafana/grafana:latest
-    container_name: esg-grafana
     restart: unless-stopped
     ports:
       - "3001:3000"
