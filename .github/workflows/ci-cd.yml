@@ -156,7 +156,7 @@ jobs:
             echo "Deploy em Staging — versão $APP_VERSION"
 
             docker compose -p esg-staging -f docker-compose.yml -f docker-compose.staging.yml pull
-            docker compose -p esg-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans
+            docker compose -p esg-staging -f docker-compose.yml -f docker-compose.staging.yml up -d --remove-orphans --force-recreate
 
             echo "Aguardando API ficar saudável..."
             for i in $(seq 1 40); do
@@ -263,7 +263,7 @@ jobs:
             echo "Deploy em Produção — versão $APP_VERSION"
 
             docker compose -p esg-prod -f docker-compose.yml -f docker-compose.prod.yml pull
-            docker compose -p esg-prod -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -p esg-prod -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans --force-recreate
 
             echo "Aguardando API ficar saudável em PRODUÇÃO..."
             for i in $(seq 1 40); do
